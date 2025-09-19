@@ -8,7 +8,7 @@ mod config;
 mod ai;
 mod tui;
 
-use cli::CliArgs;
+use cli::{CliArgs, Commands};
 use tui::app::App;
 
 #[tokio::main]
@@ -25,19 +25,21 @@ async fn main() -> Result<()> {
         }
         None => {
             // Launch interactive TUI
-            launch_tui().await?;
+            if let Some(cmd) = launch_tui().await? {
+                commands::execute_command(cmd).await?;
+            }
         }
     }
 
     Ok(())
 }
 
-async fn launch_tui() -> Result<()> {
+async fn launch_tui() -> Result<Option<Commands>> {
     println!("{}", style("🚀 Welcome to Dev Tools CLI").bold().cyan());
     println!("{}", style("Loading beautiful interface...").dim());
 
     let mut app = App::new().await?;
     app.run().await?;
 
-    Ok(())
+    Ok(app.get_selected_command())
 }

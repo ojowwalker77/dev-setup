@@ -12,7 +12,7 @@ pub struct CliArgs {
     pub command: Option<Commands>,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Clone)]
 pub enum Commands {
     /// Start development server
     #[command(alias = "s")]

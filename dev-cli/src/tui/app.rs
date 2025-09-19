@@ -17,6 +17,7 @@ use std::{
     time::Duration,
 };
 
+use crate::cli::Commands;
 use crate::commands;
 use crate::config::Config;
 
@@ -24,6 +25,7 @@ pub struct App {
     pub should_quit: bool,
     pub menu_state: ListState,
     pub ai_enabled: bool,
+    pub selected_command: Option<Commands>,
 
     pub status_message: Option<String>,
     pub loading: bool,
@@ -82,6 +84,7 @@ impl App {
             should_quit: false,
             menu_state: state,
             ai_enabled,
+            selected_command: None,
             status_message: None,
             loading: false,
             menu_items,
@@ -114,7 +117,7 @@ impl App {
         Ok(())
     }
 
-    async fn run_app<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> Result<()> {
+    async fn run_app<B: Backend + std::io::Write>(&mut self, terminal: &mut Terminal<B>) -> Result<()> {
         loop {
             terminal.draw(|f| self.ui(f))?;
 
@@ -132,7 +135,7 @@ impl App {
                                 self.previous_item();
                             }
                             KeyCode::Enter => {
-                                self.execute_selected_item().await?;
+                                self.execute_selected_item(terminal).await?;
                             }
                             _ => {}
                         }
@@ -175,47 +178,79 @@ impl App {
         self.menu_state.select(Some(i));
     }
 
-    async fn execute_selected_item(&mut self) -> Result<()> {
+    async fn execute_selected_item<B: Backend + std::io::Write>(&mut self, terminal: &mut Terminal<B>) -> Result<()> {
         if let Some(i) = self.menu_state.selected() {
-            if let Some(item) = self.menu_items.get(i) {
-                self.loading = true;
-                self.status_message = Some(format!("Executing: {}", item.title));
-
-                match item.id.as_str() {
-                    "start" => {
-                        self.should_quit = true;
-                        commands::execute_command(crate::cli::Commands::Start).await?;
-                    }
-                    "build" => {
-                        commands::execute_command(crate::cli::Commands::Build).await?;
-                    }
-                    "push" => {
-                        commands::execute_command(crate::cli::Commands::Push).await?;
-                    }
-                    "lint" => {
-                        commands::execute_command(crate::cli::Commands::Lint).await?;
-                    }
-                    "typecheck" => {
-                        commands::execute_command(crate::cli::Commands::TypeCheck).await?;
-                    }
-                    "ai_debug" => {
-                        if self.ai_enabled {
-                            commands::execute_command(crate::cli::Commands::Analyze { error: None }).await?;
-                        } else {
-                            commands::execute_command(crate::cli::Commands::Setup).await?;
-                        }
-                    }
-                    "ai_config" => {
-                        commands::execute_command(crate::cli::Commands::Setup).await?;
-                    }
-                    _ => {}
+            if let Some(item) = self.menu_items.get(i).cloned() {
+                if item.id == "start" {
+                    self.should_quit = true;
+                    self.selected_command = Some(Commands::Start);
+                    return Ok(());
                 }
 
+                self.loading = true;
+                self.status_message = Some(format!("Executing: {}", item.title));
+                terminal.draw(|f| self.ui(f))?;
+
+                let command_to_run = match item.id.as_str() {
+                    "build" => commands::execute_command(crate::cli::Commands::Build),
+                    "push" => commands::execute_command(crate::cli::Commands::Push),
+                    "lint" => commands::execute_command(crate::cli::Commands::Lint),
+                    "typecheck" => commands::execute_command(crate::cli::Commands::TypeCheck),
+                    "ai_debug" => {
+                        if self.ai_enabled {
+                            commands::execute_command(crate::cli::Commands::Analyze { error: None })
+                        } else {
+                            commands::execute_command(crate::cli::Commands::Setup)
+                        }
+                    }
+                    "ai_config" => commands::execute_command(crate::cli::Commands::Setup),
+                    _ => return Ok(()), // Should not happen
+                };
+
+                let res = self.suspend_terminal_and_run_command(terminal, || async {
+                    command_to_run.await
+                }).await;
+
+
                 self.loading = false;
-                self.status_message = Some(format!("✓ {}", item.title));
+                if let Err(e) = res {
+                    self.status_message = Some(format!("✗ Error: {}", e));
+                } else {
+                    self.status_message = Some(format!("✓ '{}' completed.", item.title));
+                }
             }
         }
         Ok(())
+    }
+
+    async fn suspend_terminal_and_run_command<B: Backend + std::io::Write, F, Fut>(&mut self, terminal: &mut Terminal<B>, command_fn: F) -> Result<()>
+    where
+        F: FnOnce() -> Fut,
+        Fut: std::future::Future<Output = Result<()>>,
+    {
+        disable_raw_mode()?;
+        execute!(
+            terminal.backend_mut(),
+            LeaveAlternateScreen,
+            DisableMouseCapture
+        )?;
+        terminal.show_cursor()?;
+
+        let result = command_fn().await;
+
+        enable_raw_mode()?;
+        execute!(
+            terminal.backend_mut(),
+            EnterAlternateScreen,
+            EnableMouseCapture
+        )?;
+        terminal.clear()?;
+
+        result
+    }
+
+    pub fn get_selected_command(&self) -> Option<Commands> {
+        self.selected_command.clone()
     }
 
     fn ui(&mut self, f: &mut Frame) {
@@ -241,17 +276,10 @@ impl App {
             .iter()
             .enumerate()
             .map(|(i, item)| {
-                let style = if Some(i) == self.menu_state.selected() {
-                    Style::default().bg(Color::Blue).fg(Color::White)
-                } else {
-                    Style::default()
-                };
-
                 let content = Line::from(vec![
                     Span::styled(format!("{}. ", i + 1), Style::default().fg(Color::Yellow)),
-                    Span::styled(&item.title, style),
+                    Span::from(item.title.as_str()),
                 ]);
-
                 ListItem::new(content)
             })
             .collect();
@@ -266,8 +294,10 @@ impl App {
             .highlight_style(
                 Style::default()
                     .bg(Color::Blue)
+                    .fg(Color::White)
                     .add_modifier(Modifier::BOLD),
-            );
+            )
+            .highlight_symbol("> ");
 
         f.render_stateful_widget(menu, chunks[1], &mut self.menu_state);
 
@@ -286,12 +316,11 @@ impl App {
         // Loading indicator
         if self.loading {
             let popup_area = centered_rect(50, 20, f.area());
+            let popup_block = Block::default().title("Running Command").borders(Borders::ALL);
+            let popup_content = Paragraph::new(self.status_message.clone().unwrap_or_default())
+                .block(popup_block);
             f.render_widget(Clear, popup_area);
-            let loading_block = Block::default()
-                .title("Processing...")
-                .borders(Borders::ALL)
-                .style(Style::default().fg(Color::Yellow));
-            f.render_widget(loading_block, popup_area);
+            f.render_widget(popup_content, popup_area);
         }
     }
 }
