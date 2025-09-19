@@ -1,0 +1,102 @@
+#!/bin/bash
+
+# Centralized Development Script
+# Provides a menu for common development tasks
+
+set -e
+
+# Colors for better UX
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+show_menu() {
+    echo -e "${BLUE}🚀 Development Menu${NC}"
+    echo -e "${BLUE}===================${NC}"
+    echo ""
+    echo -e "${GREEN}1)${NC} Start development server (npm run dev)"
+    echo -e "${GREEN}2)${NC} Run build and type check"
+    echo -e "${GREEN}3)${NC} Commit and push changes"
+    echo -e "${GREEN}4)${NC} Run linting only"
+    echo -e "${GREEN}5)${NC} Run type check only"
+    echo -e "${RED}6)${NC} Exit"
+    echo ""
+    echo -e "${YELLOW}Enter your choice [1-6]:${NC} "
+}
+
+# Function to handle npm run dev
+start_dev_server() {
+    echo -e "${BLUE}🔥 Starting development server...${NC}"
+    npm run dev
+}
+
+# Function to run build check
+run_build_check() {
+    echo -e "${BLUE}🔍 Running build and type checks...${NC}"
+    ./scripts/build-check.sh
+}
+
+# Function to commit and push
+commit_and_push() {
+    echo -e "${BLUE}📦 Committing and pushing changes...${NC}"
+    ./scripts/push-code.sh
+}
+
+# Function to run linting only
+run_lint() {
+    echo -e "${BLUE}🔍 Running ESLint...${NC}"
+    npm run lint
+}
+
+# Function to run type check only
+run_type_check() {
+    echo -e "${BLUE}🔧 Running TypeScript type check...${NC}"
+    npm run type-check
+}
+
+# Main loop
+while true; do
+    show_menu
+    read -r choice
+
+    case $choice in
+        1)
+            start_dev_server
+            break
+            ;;
+        2)
+            run_build_check
+            echo ""
+            echo -e "${GREEN}✅ Build check completed!${NC}"
+            echo ""
+            ;;
+        3)
+            commit_and_push
+            echo ""
+            echo -e "${GREEN}✅ Push completed!${NC}"
+            echo ""
+            ;;
+        4)
+            run_lint
+            echo ""
+            echo -e "${GREEN}✅ Linting completed!${NC}"
+            echo ""
+            ;;
+        5)
+            run_type_check
+            echo ""
+            echo -e "${GREEN}✅ Type check completed!${NC}"
+            echo ""
+            ;;
+        6)
+            echo -e "${BLUE}👋 Goodbye!${NC}"
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}❌ Invalid option. Please choose 1-6.${NC}"
+            echo ""
+            ;;
+    esac
+done
