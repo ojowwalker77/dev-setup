@@ -1,9 +1,8 @@
 use anyhow::Result;
 use console::style;
 use indicatif::{ProgressBar, ProgressStyle};
-use std::process::Stdio;
 use tokio::process::Command;
-use tokio::io::{AsyncBufReadExt, BufReader};
+
 
 use crate::cli::Commands;
 use crate::ai::analyze_error;

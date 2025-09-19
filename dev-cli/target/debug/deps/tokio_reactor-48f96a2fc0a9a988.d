@@ -1,0 +1,9 @@
+/Users/thorin/www/dev-setup-template/dev-cli/target/debug/deps/tokio_reactor-48f96a2fc0a9a988.d: /Users/thorin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-reactor-0.1.12/src/lib.rs /Users/thorin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-reactor-0.1.12/src/background.rs /Users/thorin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-reactor-0.1.12/src/poll_evented.rs /Users/thorin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-reactor-0.1.12/src/registration.rs /Users/thorin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-reactor-0.1.12/src/sharded_rwlock.rs
+
+/Users/thorin/www/dev-setup-template/dev-cli/target/debug/deps/libtokio_reactor-48f96a2fc0a9a988.rmeta: /Users/thorin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-reactor-0.1.12/src/lib.rs /Users/thorin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-reactor-0.1.12/src/background.rs /Users/thorin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-reactor-0.1.12/src/poll_evented.rs /Users/thorin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-reactor-0.1.12/src/registration.rs /Users/thorin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-reactor-0.1.12/src/sharded_rwlock.rs
+
+/Users/thorin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-reactor-0.1.12/src/lib.rs:
+/Users/thorin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-reactor-0.1.12/src/background.rs:
+/Users/thorin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-reactor-0.1.12/src/poll_evented.rs:
+/Users/thorin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-reactor-0.1.12/src/registration.rs:
+/Users/thorin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-reactor-0.1.12/src/sharded_rwlock.rs:

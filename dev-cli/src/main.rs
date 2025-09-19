@@ -1,7 +1,6 @@
 use anyhow::Result;
-use clap::{Parser, Subcommand};
+use clap::Parser;
 use console::style;
-use std::io;
 
 mod cli;
 mod commands;

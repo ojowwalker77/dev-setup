@@ -6,15 +6,15 @@ use crossterm::{
 };
 use ratatui::{
     backend::{Backend, CrosstermBackend},
-    layout::{Constraint, Direction, Layout, Margin},
+    layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    text::{Line, Span, Text},
-    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap},
+    text::{Line, Span},
+    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
     Frame, Terminal,
 };
 use std::{
     io,
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use crate::commands;
@@ -24,7 +24,7 @@ pub struct App {
     pub should_quit: bool,
     pub menu_state: ListState,
     pub ai_enabled: bool,
-    pub config: Config,
+
     pub status_message: Option<String>,
     pub loading: bool,
     pub menu_items: Vec<MenuItem>,
@@ -34,8 +34,6 @@ pub struct App {
 pub struct MenuItem {
     pub id: String,
     pub title: String,
-    pub description: String,
-    pub enabled: bool,
 }
 
 impl App {
@@ -47,38 +45,26 @@ impl App {
             MenuItem {
                 id: "start".to_string(),
                 title: "Start development server".to_string(),
-                description: "Launch npm run dev".to_string(),
-                enabled: true,
             },
             MenuItem {
                 id: "build".to_string(),
                 title: "Run build and type check".to_string(),
-                description: "Execute build validation".to_string(),
-                enabled: true,
             },
             MenuItem {
                 id: "push".to_string(),
                 title: "Commit and push changes".to_string(),
-                description: "Git workflow automation".to_string(),
-                enabled: true,
             },
             MenuItem {
                 id: "lint".to_string(),
                 title: "Run linting only".to_string(),
-                description: "Execute ESLint checks".to_string(),
-                enabled: true,
             },
             MenuItem {
                 id: "typecheck".to_string(),
                 title: "Run type check only".to_string(),
-                description: "TypeScript validation".to_string(),
-                enabled: true,
             },
             MenuItem {
                 id: "ai_debug".to_string(),
                 title: if ai_enabled { "AI Debug Mode" } else { "Setup AI Error Fixing" }.to_string(),
-                description: if ai_enabled { "Analyze recent errors with AI" } else { "Configure Gemini API" }.to_string(),
-                enabled: true,
             },
         ];
 
@@ -86,8 +72,6 @@ impl App {
             menu_items.push(MenuItem {
                 id: "ai_config".to_string(),
                 title: "Reconfigure AI settings".to_string(),
-                description: "Update Gemini API key".to_string(),
-                enabled: true,
             });
         }
 
@@ -98,7 +82,6 @@ impl App {
             should_quit: false,
             menu_state: state,
             ai_enabled,
-            config,
             status_message: None,
             loading: false,
             menu_items,
@@ -244,7 +227,7 @@ impl App {
                 Constraint::Min(0),
                 Constraint::Length(3),
             ])
-            .split(f.size());
+            .split(f.area());
 
         // Header
         let header = Paragraph::new("🚀 Dev Tools CLI")
@@ -302,7 +285,7 @@ impl App {
 
         // Loading indicator
         if self.loading {
-            let popup_area = centered_rect(50, 20, f.size());
+            let popup_area = centered_rect(50, 20, f.area());
             f.render_widget(Clear, popup_area);
             let loading_block = Block::default()
                 .title("Processing...")
