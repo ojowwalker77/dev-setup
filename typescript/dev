@@ -1,60 +1,455 @@
 #!/bin/bash
 
-# Centralized Development Script
-# Provides a menu for common development tasks
+# Centralized Development Script with AI Error Fixing
+# Provides a menu for common development tasks with Gemini AI integration
 
-set -e
+# Note: Removed 'set -e' to allow error capture for AI analysis
 
-# Colors for better UX
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+# Minimalist color palette inspired by Codex CLI
+GRAY='\033[0;90m'
+WHITE='\033[1;37m'
+SUBTLE_BLUE='\033[0;94m'
+SUBTLE_GREEN='\033[0;92m'
+SUBTLE_PURPLE='\033[0;95m'
+SUBTLE_CYAN='\033[0;96m'
+DIM='\033[2m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+# Simple box characters - clean and minimal
+HORIZONTAL='─'
+VERTICAL='│'
+TOP_LEFT='┌'
+TOP_RIGHT='┐'
+BOTTOM_LEFT='└'
+BOTTOM_RIGHT='┘'
+
+# Configuration
+CONFIG_FILE="$HOME/.dev-config"
+TEMP_ERROR_FILE="/tmp/dev-errors.log"
+AI_ENABLED=false
+
+# Minimal UI functions inspired by Codex
+draw_section() {
+    local title="$1"
+    local width=${2:-50}
+
+    echo ""
+    echo -e "${GRAY}${TOP_LEFT}$(printf '%*s' $((width-2)) '' | tr ' ' "${HORIZONTAL}")${TOP_RIGHT}${NC}"
+    if [[ -n "$title" ]]; then
+        local title_len=${#title}
+        local padding=$((width - title_len - 2))
+        echo -e "${GRAY}${VERTICAL}${NC} ${BOLD}${title}${NC}$(printf '%*s' ${padding} '')${GRAY}${VERTICAL}${NC}"
+    fi
+}
+
+draw_section_end() {
+    local width=${1:-50}
+    echo -e "${GRAY}${BOTTOM_LEFT}$(printf '%*s' $((width-2)) '' | tr ' ' "${HORIZONTAL}")${BOTTOM_RIGHT}${NC}"
+}
+
+draw_item() {
+    local number="$1"
+    local text="$2"
+    local width=${3:-50}
+
+    local padding=$((width - ${#number} - ${#text} - 4))
+    echo -e "${GRAY}${VERTICAL}${NC} ${SUBTLE_CYAN}${number})${NC} ${text}$(printf '%*s' ${padding} '')${GRAY}${VERTICAL}${NC}"
+}
+
+show_status() {
+    local status="$1"
+    case $status in
+        "success") echo -e "${SUBTLE_GREEN}●${NC}" ;;
+        "error") echo -e "${GRAY}●${NC}" ;;
+        "ai") echo -e "${SUBTLE_PURPLE}●${NC}" ;;
+        *) echo -e "${GRAY}●${NC}" ;;
+    esac
+}
+
+# Load configuration
+load_config() {
+    if [[ -f "$CONFIG_FILE" ]]; then
+        source "$CONFIG_FILE"
+        if [[ -n "$GEMINI_API_KEY" ]]; then
+            AI_ENABLED=true
+        fi
+    fi
+}
+
+# Setup Gemini API key
+setup_ai() {
+    echo -e "${PURPLE}🤖 AI Error Fixing Setup${NC}"
+    echo -e "${PURPLE}========================${NC}"
+    echo ""
+    echo -e "${YELLOW}Enter your Gemini API key (get it from https://aistudio.google.com/app/apikey):${NC}"
+    read -r -s api_key
+
+    if [[ -n "$api_key" ]]; then
+        echo "GEMINI_API_KEY=\"$api_key\"" > "$CONFIG_FILE"
+        chmod 600 "$CONFIG_FILE"
+        AI_ENABLED=true
+        echo ""
+        echo -e "${GREEN}✅ AI integration enabled! Errors will now be sent to Gemini for analysis.${NC}"
+    else
+        echo -e "${RED}❌ No API key provided. AI features disabled.${NC}"
+    fi
+    echo ""
+}
+
+# Send error to Gemini for analysis
+analyze_error_with_ai() {
+    local error_output="$1"
+    local error_type="$2"
+    # Removed project_context to minimize prompt size
+
+    if [[ "$AI_ENABLED" != "true" ]]; then
+        return 1
+    fi
+
+    echo ""
+    echo -e "${DIM}Analyzing error with AI...${NC}"
+
+    # Strip error to essential info only - just the key error line
+    local clean_error=$(echo "$error_output" | grep -E "(npm error|Error|ERROR)" | head -1 | cut -c1-100)
+
+    # Ultra-minimal prompt to avoid token issues
+    local prompt="Error: $clean_error
+Fix in 15 words:"
+
+    # Check if jq is available
+    if ! command -v jq &> /dev/null; then
+        echo -e "${RED}❌ jq is required for AI analysis but not installed.${NC}"
+        echo -e "${YELLOW}💡 Install with: brew install jq (macOS) or apt install jq (Linux)${NC}"
+        return 1
+    fi
+
+    # Make API call to Gemini
+    local response
+    local json_payload
+
+    # Create JSON payload properly
+    json_payload=$(jq -n \
+        --arg text "$prompt" \
+        '{
+            "contents": [{
+                "parts": [{
+                    "text": $text
+                }]
+            }],
+            "generationConfig": {
+                "maxOutputTokens": 1000,
+                "temperature": 0.1,
+                "topP": 0.9
+            }
+        }')
+
+    # Use temporary files for cleaner response handling
+    local temp_response="/tmp/gemini_response_$$"
+    local temp_headers="/tmp/gemini_headers_$$"
+
+    local http_code
+    http_code=$(curl -s -w "%{http_code}" -o "$temp_response" -D "$temp_headers" -X POST \
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$GEMINI_API_KEY" \
+        -H 'Content-Type: application/json' \
+        -H 'Accept: application/json' \
+        -d "$json_payload" 2>/dev/null)
+
+    local response_body=""
+    if [[ -f "$temp_response" ]]; then
+        response_body=$(cat "$temp_response")
+        rm -f "$temp_response" "$temp_headers"
+    fi
+
+    if [[ "$http_code" == "200" ]] && [[ -n "$response_body" ]]; then
+        # Check if response has the expected structure
+        local has_candidates
+        has_candidates=$(echo "$response_body" | jq -r '.candidates // empty' 2>/dev/null)
+
+        if [[ -n "$has_candidates" && "$has_candidates" != "null" ]]; then
+            local ai_text
+            ai_text=$(echo "$response_body" | jq -r '.candidates[0].content.parts[0].text' 2>/dev/null)
+
+            if [[ "$ai_text" != "null" ]] && [[ -n "$ai_text" ]]; then
+                echo ""
+                echo -e "${SUBTLE_GREEN}AI Solution:${NC}"
+                echo "$ai_text"
+                echo ""
+                echo -e "${DIM}Save analysis to file? (y/N):${NC} "
+                read -r save_analysis
+                if [[ "$save_analysis" =~ ^[Yy]$ ]]; then
+                    local analysis_file="/tmp/ai-analysis-$(date +%s).txt"
+                    echo "$ai_text" > "$analysis_file"
+                    echo -e "${SUBTLE_GREEN}✓${NC} Analysis saved to $analysis_file"
+                fi
+                echo ""
+                return 0
+            fi
+        else
+            # Check if response was truncated due to token limit
+            local finish_reason
+            finish_reason=$(echo "$response_body" | jq -r '.candidates[0].finishReason // empty' 2>/dev/null)
+            if [[ "$finish_reason" == "MAX_TOKENS" ]]; then
+                echo -e "${RED}❌ AI response was cut off. Prompt was too long!${NC}"
+                echo -e "${YELLOW}Debug: Prompt length was $(echo "$prompt" | wc -c) characters${NC}"
+                return 1
+            elif [[ "$finish_reason" == "STOP" ]]; then
+                echo -e "${YELLOW}⚠️  AI finished normally but no content found${NC}"
+                return 1
+            fi
+
+            # Check for API error in response
+            local error_message
+            error_message=$(echo "$response_body" | jq -r '.error.message // empty' 2>/dev/null)
+            if [[ -n "$error_message" ]]; then
+                echo -e "${RED}❌ API Error: $error_message${NC}"
+                return 1
+            fi
+        fi
+    fi
+
+    # Provide more specific error messages
+    if [[ "$http_code" == "400" ]]; then
+        echo -e "${RED}❌ Bad request. The API request format may be incorrect.${NC}"
+        echo -e "${YELLOW}💡 Try reconfiguring your API key with option 7.${NC}"
+    elif [[ "$http_code" == "401" ]]; then
+        echo -e "${RED}❌ Invalid API key. Please reconfigure with option 7.${NC}"
+    elif [[ "$http_code" == "403" ]]; then
+        echo -e "${RED}❌ API access forbidden. Check your Gemini API key permissions.${NC}"
+    elif [[ "$http_code" == "429" ]]; then
+        echo -e "${RED}❌ Rate limit exceeded. Please try again later.${NC}"
+    elif [[ -z "$http_code" ]]; then
+        echo -e "${RED}❌ No response from API. Check your internet connection.${NC}"
+    else
+        echo -e "${RED}❌ AI analysis failed (HTTP $http_code). Check your API key and connection.${NC}"
+        # Show first few lines of error response for debugging
+        if [[ -n "$response_body" ]]; then
+            echo -e "${YELLOW}Response: $(echo "$response_body" | head -c 200)...${NC}"
+        fi
+    fi
+
+    # Fallback: provide basic help based on error type
+    echo ""
+    echo -e "${SUBTLE_CYAN}Quick Fix Suggestion:${NC}"
+    if echo "$error_output" | grep -q "package.json"; then
+        echo "Missing package.json → Run: npm init -y"
+    elif echo "$error_output" | grep -q "module not found"; then
+        echo "Missing dependency → Run: npm install"
+    elif echo "$error_output" | grep -q "TypeScript"; then
+        echo "TypeScript error → Check tsconfig.json"
+    else
+        echo "Check error logs above for specific commands"
+    fi
+    echo ""
+    return 1
+}
+
+# Get project context for AI
+get_project_context() {
+    local context=""
+
+    # Get package.json info if available
+    if [[ -f "package.json" ]]; then
+        context+="PACKAGE.JSON DEPENDENCIES:\n"
+        context+=$(cat package.json | jq -r '.dependencies // {}, .devDependencies // {}' 2>/dev/null || echo "Could not parse package.json")
+        context+="\n\n"
+    fi
+
+    # Get TypeScript config if available
+    if [[ -f "tsconfig.json" ]]; then
+        context+="TYPESCRIPT CONFIG:\n"
+        context+=$(head -20 tsconfig.json)
+        context+="\n\n"
+    fi
+
+    # Get recent git commits for context
+    if git rev-parse --git-dir > /dev/null 2>&1; then
+        context+="RECENT COMMITS:\n"
+        context+=$(git log --oneline -5 2>/dev/null || echo "No git history")
+        context+="\n\n"
+    fi
+
+    echo "$context"
+}
 
 show_menu() {
-    echo -e "${BLUE}🚀 Development Menu${NC}"
-    echo -e "${BLUE}===================${NC}"
+    clear
+
+    # Clean header like Codex
     echo ""
-    echo -e "${GREEN}1)${NC} Start development server (npm run dev)"
-    echo -e "${GREEN}2)${NC} Run build and type check"
-    echo -e "${GREEN}3)${NC} Commit and push changes"
-    echo -e "${GREEN}4)${NC} Run linting only"
-    echo -e "${GREEN}5)${NC} Run type check only"
-    echo -e "${RED}6)${NC} Exit"
+    echo -e "${BOLD}Dev Tools CLI${NC}"
+    echo -e "${DIM}Modern development workflow with AI assistance${NC}"
+
+    # Development section
+    draw_section "Development Actions"
+    draw_item "1" "Start development server"
+    draw_item "2" "Run build and type check"
+    draw_item "3" "Commit and push changes"
+    draw_item "4" "Run linting only"
+    draw_item "5" "Run type check only"
+    draw_section_end
+
+    # AI section
+    if [[ "$AI_ENABLED" == "true" ]]; then
+        draw_section "AI Assistant $(show_status "ai")"
+        draw_item "6" "AI Debug Mode (analyze recent errors)"
+        draw_item "7" "Reconfigure AI settings"
+    else
+        draw_section "AI Assistant"
+        draw_item "6" "Setup AI Error Fixing (Gemini)"
+        draw_item "7" "${DIM}AI Debug Mode (requires setup)${NC}"
+    fi
+    draw_section_end
+
+    # Simple exit
     echo ""
-    echo -e "${YELLOW}Enter your choice [1-6]:${NC} "
+    echo -e "${GRAY}${VERTICAL}${NC} ${SUBTLE_CYAN}8)${NC} Exit$(printf '%*s' 41 '')${GRAY}${VERTICAL}${NC}"
+    draw_section_end
+
+    echo ""
+    echo -e "${DIM}Enter your choice [1-8]:${NC} "
 }
 
 # Function to handle npm run dev
 start_dev_server() {
-    echo -e "${BLUE}🔥 Starting development server...${NC}"
+    echo ""
+    echo -e "${DIM}Starting development server...${NC}"
+    echo ""
     npm run dev
 }
 
-# Function to run build check
+# Function to run build check with AI error analysis
 run_build_check() {
-    echo -e "${BLUE}🔍 Running build and type checks...${NC}"
-    ./scripts/build-check.sh
+    echo ""
+    echo -e "${DIM}Running build and type checks...${NC}"
+    echo ""
+
+    # Clear previous error log
+    > "$TEMP_ERROR_FILE"
+
+    # Run build check and capture errors
+    ./scripts/build-check.sh 2>&1 | tee "$TEMP_ERROR_FILE"
+    local exit_code=${PIPESTATUS[0]}
+
+    # Check if we have errors (non-zero exit or error content) and AI is enabled
+    if [[ $exit_code -ne 0 ]] || [[ -s "$TEMP_ERROR_FILE" && $(grep -i "error\|fail\|npm error" "$TEMP_ERROR_FILE") ]]; then
+        if [[ "$AI_ENABLED" == "true" ]]; then
+            echo ""
+            echo -e "${YELLOW}❗ Build errors detected. Would you like AI analysis? (Y/n):${NC} "
+            read -r want_ai
+
+            if [[ ! "$want_ai" =~ ^[Nn]$ ]]; then
+                analyze_error_with_ai "$(cat "$TEMP_ERROR_FILE")" "BUILD_ERROR"
+            fi
+        fi
+        echo ""
+        echo -e "${RED}❌ Build check failed!${NC}"
+        return $exit_code
+    fi
 }
 
-# Function to commit and push
+# Function to commit and push with AI error analysis
 commit_and_push() {
     echo -e "${BLUE}📦 Committing and pushing changes...${NC}"
-    ./scripts/push-code.sh
+
+    # Clear previous error log
+    > "$TEMP_ERROR_FILE"
+
+    # Run push script and capture errors
+    ./scripts/push-code.sh 2>&1 | tee "$TEMP_ERROR_FILE"
+    local exit_code=${PIPESTATUS[0]}
+
+    # Check if we have errors (non-zero exit or error content) and AI is enabled
+    if [[ $exit_code -ne 0 ]] || [[ -s "$TEMP_ERROR_FILE" && $(grep -i "error\|fail\|npm error" "$TEMP_ERROR_FILE") ]]; then
+        if [[ "$AI_ENABLED" == "true" ]]; then
+            echo ""
+            echo -e "${YELLOW}❗ Push/build errors detected. Would you like AI analysis? (Y/n):${NC} "
+            read -r want_ai
+
+            if [[ ! "$want_ai" =~ ^[Nn]$ ]]; then
+                analyze_error_with_ai "$(cat "$TEMP_ERROR_FILE")" "PUSH_ERROR"
+            fi
+        fi
+        echo ""
+        echo -e "${RED}❌ Push failed due to errors!${NC}"
+        return $exit_code
+    fi
 }
 
-# Function to run linting only
+# Function to run linting with AI error analysis
 run_lint() {
     echo -e "${BLUE}🔍 Running ESLint...${NC}"
-    npm run lint
+
+    # Clear previous error log
+    > "$TEMP_ERROR_FILE"
+
+    # Run linting and capture errors
+    npm run lint 2>&1 | tee "$TEMP_ERROR_FILE"
+    local exit_code=${PIPESTATUS[0]}
+
+    # Check if we have errors (non-zero exit or error content) and AI is enabled
+    if [[ $exit_code -ne 0 ]] || [[ -s "$TEMP_ERROR_FILE" && $(grep -i "error\|fail\|npm error" "$TEMP_ERROR_FILE") ]]; then
+        if [[ "$AI_ENABLED" == "true" ]]; then
+            echo ""
+            echo -e "${YELLOW}❗ Linting errors detected. Would you like AI analysis? (Y/n):${NC} "
+            read -r want_ai
+
+            if [[ ! "$want_ai" =~ ^[Nn]$ ]]; then
+                analyze_error_with_ai "$(cat "$TEMP_ERROR_FILE")" "LINT_ERROR"
+            fi
+        fi
+        echo ""
+        echo -e "${RED}❌ Linting failed!${NC}"
+        return $exit_code
+    fi
 }
 
-# Function to run type check only
+# Function to run type check with AI error analysis
 run_type_check() {
     echo -e "${BLUE}🔧 Running TypeScript type check...${NC}"
-    npm run type-check
+
+    # Clear previous error log
+    > "$TEMP_ERROR_FILE"
+
+    # Run type check and capture errors
+    npm run type-check 2>&1 | tee "$TEMP_ERROR_FILE"
+    local exit_code=${PIPESTATUS[0]}
+
+    # Check if we have errors (non-zero exit or error content) and AI is enabled
+    if [[ $exit_code -ne 0 ]] || [[ -s "$TEMP_ERROR_FILE" && $(grep -i "error\|fail\|npm error" "$TEMP_ERROR_FILE") ]]; then
+        if [[ "$AI_ENABLED" == "true" ]]; then
+            echo ""
+            echo -e "${YELLOW}❗ Type errors detected. Would you like AI analysis? (Y/n):${NC} "
+            read -r want_ai
+
+            if [[ ! "$want_ai" =~ ^[Nn]$ ]]; then
+                analyze_error_with_ai "$(cat "$TEMP_ERROR_FILE")" "TYPE_ERROR"
+            fi
+        fi
+        echo ""
+        echo -e "${RED}❌ Type check failed!${NC}"
+        return $exit_code
+    fi
 }
+
+# AI Debug Mode - analyze recent errors
+ai_debug_mode() {
+    echo -e "${PURPLE}🤖 AI Debug Mode${NC}"
+    echo -e "${PURPLE}===============${NC}"
+    echo ""
+
+    if [[ ! -f "$TEMP_ERROR_FILE" ]] || [[ ! -s "$TEMP_ERROR_FILE" ]]; then
+        echo -e "${YELLOW}No recent errors found. Try running a build, lint, or type check first.${NC}"
+        echo ""
+        return
+    fi
+
+    echo -e "${CYAN}Recent errors found. Analyzing with AI...${NC}"
+    analyze_error_with_ai "$(cat "$TEMP_ERROR_FILE")" "DEBUG_SESSION"
+}
+
+# Load configuration on startup
+load_config
 
 # Main loop
 while true; do
@@ -67,35 +462,62 @@ while true; do
             break
             ;;
         2)
-            run_build_check
-            echo ""
-            echo -e "${GREEN}✅ Build check completed!${NC}"
-            echo ""
+            if run_build_check; then
+                echo ""
+                echo -e "${GREEN}✅ Build check completed!${NC}"
+                echo ""
+            else
+                echo ""
+            fi
             ;;
         3)
-            commit_and_push
-            echo ""
-            echo -e "${GREEN}✅ Push completed!${NC}"
-            echo ""
+            if commit_and_push; then
+                echo ""
+                echo -e "${GREEN}✅ Push completed!${NC}"
+                echo ""
+            else
+                echo ""
+            fi
             ;;
         4)
-            run_lint
-            echo ""
-            echo -e "${GREEN}✅ Linting completed!${NC}"
-            echo ""
+            if run_lint; then
+                echo ""
+                echo -e "${GREEN}✅ Linting completed!${NC}"
+                echo ""
+            else
+                echo ""
+            fi
             ;;
         5)
-            run_type_check
-            echo ""
-            echo -e "${GREEN}✅ Type check completed!${NC}"
-            echo ""
+            if run_type_check; then
+                echo ""
+                echo -e "${GREEN}✅ Type check completed!${NC}"
+                echo ""
+            else
+                echo ""
+            fi
             ;;
         6)
+            if [[ "$AI_ENABLED" == "true" ]]; then
+                ai_debug_mode
+            else
+                setup_ai
+            fi
+            ;;
+        7)
+            if [[ "$AI_ENABLED" == "true" ]]; then
+                setup_ai
+            else
+                echo -e "${YELLOW}⚠️  AI Debug Mode requires setup first. Please choose option 6 to configure Gemini.${NC}"
+                echo ""
+            fi
+            ;;
+        8)
             echo -e "${BLUE}👋 Goodbye!${NC}"
             exit 0
             ;;
         *)
-            echo -e "${RED}❌ Invalid option. Please choose 1-6.${NC}"
+            echo -e "${RED}❌ Invalid option. Please choose 1-8.${NC}"
             echo ""
             ;;
     esac

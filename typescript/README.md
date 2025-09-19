@@ -84,11 +84,24 @@ alias dev="./dev"
 
 Then run `source ~/.zshrc` to activate.
 
+### 8. Setup AI Error Fixing (Optional)
+
+```bash
+# Run the dev script and choose option 6 to setup AI
+./dev
+
+# Or manually create the config file
+echo 'GEMINI_API_KEY="your-api-key-here"' > ~/.dev-config
+chmod 600 ~/.dev-config
+```
+
+Get your free Gemini API key from: https://aistudio.google.com/app/apikey
+
 ## 📋 What's Included
 
 ### Scripts
 
-- **`./dev`** - Interactive development menu
+- **`./dev`** - Interactive development menu with AI error fixing
 - **`./scripts/build-check.sh`** - Complete build validation
 - **`./scripts/push-code.sh`** - Automated git workflow
 
@@ -108,6 +121,9 @@ Then run `source ~/.zshrc` to activate.
 - ✅ **Automated build validation**
 - ✅ **Path aliases** (`@/` imports)
 - ✅ **Git workflow automation**
+- 🤖 **AI-powered error analysis** with Gemini 2.5 Flash
+- 🔧 **Smart error suggestions** for build/lint/type errors
+- 📊 **Project context awareness** for better AI analysis
 
 ## 🛠️ Usage
 
@@ -123,7 +139,40 @@ Provides interactive menu with options:
 3. Commit and push changes
 4. Run linting only
 5. Run type check only
-6. Exit
+6. Setup AI Error Fixing (Gemini) *[or AI Debug Mode if configured]*
+7. Reconfigure AI settings *[only when AI is enabled]*
+8. Exit *[7 if AI not enabled]*
+
+### 🤖 AI Error Fixing Features
+
+When Gemini AI is configured, the script provides intelligent error analysis:
+
+#### Automatic Error Detection
+- **Build errors**: Automatically captures TypeScript compilation errors
+- **Lint errors**: Captures ESLint rule violations and suggestions
+- **Type errors**: Analyzes TypeScript type checking issues
+
+#### Smart AI Analysis
+- **Context-aware**: Sends project dependencies, TypeScript config, and recent commits
+- **Error categorization**: Identifies error types (build, lint, type)
+- **Solution suggestions**: Provides step-by-step fixes and code examples
+- **Best practices**: Suggests prevention strategies
+
+#### AI Menu Options
+- **Option 6**: AI Debug Mode - Analyze most recent errors
+- **Option 7**: Reconfigure API key or setup
+
+#### Example AI Workflow
+```bash
+./dev
+# Choose option 4 (Run linting only)
+# If errors occur: "❗ Linting errors detected. Would you like AI analysis? (Y/n)"
+# AI provides detailed analysis with:
+#   - Error explanation
+#   - Step-by-step solution
+#   - Exact code fixes
+#   - Prevention tips
+```
 
 ### Manual Commands
 

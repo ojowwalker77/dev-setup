@@ -1,0 +1,50 @@
+[package]
+name = "dev-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Blazingly fast development workflow CLI with AI assistance"
+authors = ["Dev Tools Team"]
+
+[dependencies]
+# CLI framework
+clap = { version = "4.5", features = ["derive", "color"] }
+
+# Terminal UI
+ratatui = "0.28"
+crossterm = "0.28"
+
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+
+# HTTP client for AI
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+
+# JSON handling
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Process execution
+tokio-process = "0.2"
+
+# Configuration
+dirs = "5.0"
+toml = "0.8"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# Colors and styling
+console = "0.15"
+indicatif = "0.17"
+
+# File watching
+notify = "6.0"
+
+[[bin]]
+name = "dev"
+path = "src/main.rs"
