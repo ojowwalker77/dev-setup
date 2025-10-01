@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-## 🚀 One-Command Setup
+## One-Command Setup
 
 ```bash
 # In your new project directory
@@ -21,7 +21,7 @@ cd your-project
 ./setup.sh
 ```
 
-## ✅ Verify Setup
+## Verify Setup
 
 ```bash
 # Test linting
@@ -34,7 +34,7 @@ npm run type-check
 ./dev
 ```
 
-## 🎯 Daily Usage
+## Daily Usage
 
 ```bash
 # Start development
@@ -47,7 +47,7 @@ npm run build        # Build project
 ./scripts/push-code.sh  # Commit and push
 ```
 
-## 🔧 One-Time Configuration
+## One-Time Configuration
 
 Add to `~/.zshrc` or `~/.bashrc`:
 ```bash
