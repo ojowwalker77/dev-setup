@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Automated Setup Script for Development Template
-# Usage: curl -sSL https://raw.githubusercontent.com/your-username/dev-setup-template/main/typescript/setup.sh | bash
+# Usage: curl -sSL https://raw.githubusercontent.com/ojowwalker77/dev-setup/main/typescript/setup.sh | bash
 
 set -e
 
-REPO_BASE="https://raw.githubusercontent.com/your-username/dev-setup-template/main/typescript"
+REPO_BASE="https://raw.githubusercontent.com/ojowwalker77/dev-setup/main/typescript"
 
 echo "Setting up development environment..."
 
